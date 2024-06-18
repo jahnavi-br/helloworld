@@ -68,7 +68,7 @@ jobs:
           gh extension install github/gh-actions-importer
           gh actions-importer -h
         env:
-          GH_TOKEN: ${{ secrets.GITTOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
 
       - name: GitHub Actions Importer Update
         run: gh actions-importer update
