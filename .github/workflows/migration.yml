@@ -10,7 +10,6 @@ on:
       GITHUB_BASE_URL:
         type: string
         description: github url
-        default: https://github.com/
         required: true
       audit:
         type: boolean
