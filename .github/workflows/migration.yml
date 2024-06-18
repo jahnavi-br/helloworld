@@ -143,4 +143,25 @@ jobs:
           while IFS=, read -r plan_slug target_url; do
             echo "Plan_slug: $plan_slug"
             echo "Target URL: $target_url"
-            gh actions-importer migrate bamboo build --plan-slug $plan_slug --target-url $target_url --output-dir tmp/migrate/$plan_slug  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance
+            gh actions-importer migrate bamboo build --plan-slug $plan_slug --target-url $target_url --output-dir tmp/migrate/$plan_slug  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+          done < "$PLAN_SLUGS_FILE"
+
+      - name: Migrate Bamboo Deploy Plans
+        if: inputs.deploy-production_run
+        run: |
+            while IFS=, read -r deployid target_url; do
+                echo "Deploy ID: $deployid"
+                echo "Target URL: $target_url"
+                gh actions-importer migrate bamboo deployment --deployment-project-id $deployid --target-url $target_url --output-dir tmp/migrate/$deployid  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+            done < "$DeployId"
+
+      - name: Save Results as Artifacts
+        if: always()  # Ensure this step runs even if previous steps fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-results
+          path: |
+            tmp/audit/audit_summary.md
+            tmp/forecast/forecast_report.md
+            tmp/dry-run/
+            tmp/migrate/
