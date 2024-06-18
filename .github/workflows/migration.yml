@@ -1,0 +1,174 @@
+name: Bamboo_Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      BAMBOO_BASE_URL:
+        type: string
+        description: bambooUrl
+        required: true
+      GITHUB_BASE_URL:
+        type: string
+        description: github url
+        default: https://github.com/ 
+        required: true
+      audit:
+        type: boolean
+        description: to run audit  
+        required: true
+      forecast:
+        type: boolean
+        description: to run forecast  
+        required: true
+      build-dry_run:
+        type: boolean
+        description: dry_run for build plan
+        required: true 
+      deploy-dry_run:
+        type: boolean
+        description: dry_run for deploy plan
+        required: true 
+      build-production_run:
+        type: boolean
+        description: build production run
+        required: true         
+      deploy-production_run:
+        type: boolean
+        description: deploy production run
+        required: true    
+jobs:
+  migration:
+    runs-on: ubuntu-latest     
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Docker
+        run: |
+          if ! command -v docker &> /dev/null
+          then
+              echo "Docker not found. Installing Docker..."
+              sudo apt-get update
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sh get-docker.sh
+          else
+              echo "Docker is already installed. Skipping installation."
+          fi
+
+          docker --version
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install gh
+          gh --version
+          
+      - name: Install gh Actions Importer
+        run: | 
+          gh extension install github/gh-actions-importer
+          gh actions-importer -h
+        env:
+          GH_TOKEN: ${{ secrets.GITTOKEN }}
+
+      - name: GitHub Actions Importer Update
+        run: gh actions-importer update
+
+      - name: Create gittoken.txt
+        run: |
+          echo ${{ secrets.GITTOKEN }} > gittoken.txt
+          cat gittoken.txt
+
+      - name: Authentication with GitHub CLI
+        run: |
+          gh auth login --with-token < gittoken.txt
+          gh auth status
+          #run: gh auth login --with-token ${{ secrets.GITTOKEN }} -h github.com
+          #run: gh auth login --with-token ${{ secrets.GITTOKEN }}
+
+      - name: Audit Bamboo
+        if: inputs.audit
+        run: |
+          #gh auth login --with-token < gittoken.txt
+          gh actions-importer audit bamboo --output-dir tmp/audit --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+
+      - name: Display Audit Results
+        if: inputs.audit
+        run: cat tmp/audit/audit_summary.md
+
+      - name: Forecast GitHub Actions usage
+        if: inputs.forecast
+        run: gh actions-importer forecast bamboo --start-date 2024-01-17 --output-dir tmp/forecast --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+
+      - name: Display Forecast Results
+        if: inputs.forecast
+        id: display_forecast_results
+        run: cat tmp/forecast/forecast_report.md
+
+      - name: Set up Environment
+        run: |
+          echo "PLAN_SLUGS_FILE=plan_slugs.txt" >> $GITHUB_ENV
+          echo "DeployId=deploy_id.txt" >> $GITHUB_ENV
+
+      - name: Display Plan Slugs and Target URLs
+        run: |
+          cat $PLAN_SLUGS_FILE
+          cat $DeployId
+
+      - name: Dry-Run Bamboo Build Plans
+        if: inputs.build-dry_run
+        run: |
+          while IFS=, read -r plan_slug target_url; do
+            echo "Plan_slug: $plan_slug"
+            echo "Target URL: $target_url"
+            gh actions-importer dry-run bamboo build --plan-slug $plan_slug --output-dir tmp/dry-run/$plan_slug --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+    
+            # Display Dry-Run Results
+            echo "Dry-Run Results for $plan_slug:"
+            find tmp/dry-run/$plan_slug/ -name '*.yml' -print -exec cat {} \; 2>/dev/null || echo "No YAML files found for $plan_slug"                  
+          done < "$PLAN_SLUGS_FILE"
+
+
+      - name: Dry-Run Bamboo Deploy Plans
+        if: inputs.build-production_run
+        run: |
+            while IFS=, read -r deployid target_url; do
+                echo "Deploy ID: $deployid"
+                echo "Target URL: $target_url"
+                gh actions-importer dry-run bamboo deployment --deployment-project-id $deployid  --output-dir tmp/dry-run/$deployid --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+
+                #Display Dry-Run Results
+
+                echo "Dry-Run Results for deployment Id $deployid:"
+                find tmp/dry-run/$deployid/ -name '*.yml' -print -exec cat {} \; 2>/dev/null || echo "No YAML files found for $deployid"               
+            done < "$DeployId"     
+
+      - name: Migrate Bamboo Build Plans
+        if: inputs.build-production_run
+        run: |
+          while IFS=, read -r plan_slug target_url; do
+            echo "Plan_slug: $plan_slug"
+            echo "Target URL: $target_url"
+            gh actions-importer migrate bamboo build --plan-slug $plan_slug --target-url $target_url --output-dir tmp/migrate/$plan_slug  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+          done < "$PLAN_SLUGS_FILE"
+
+      - name: Migrate Bamboo Deploy Plans
+        if: inputs.deploy-production_run
+        run: |
+            while IFS=, read -r deployid target_url; do
+                echo "Deploy ID: $deployid"
+                echo "Target URL: $target_url"
+                gh actions-importer migrate bamboo deployment --deployment-project-id $deployid --target-url $target_url --output-dir tmp/migrate/$deployid  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+            done < "$DeployId"
+
+      - name: Save Results as Artifacts
+        if: always()  # Ensure this step runs even if previous steps fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-results
+          path: |
+            tmp/audit/audit_summary.md
+            tmp/forecast/forecast_report.md
+            tmp/dry-run/
+            tmp/migrate/
+
+     
