@@ -1,0 +1,15 @@
+name: deployjavaj_dev
+on:
+  workflow_dispatch:
+jobs:
+  Dev:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clean working directory
+      run: rm -rf ${{ github.workspace }}/*
+      shell: bash
+    # warning: This will download all available artifacts, ensure this is the correct behavior.
+    - uses: actions/download-artifact@v4.1.0
+    - run: |-
+        ls -la
+        pwd
