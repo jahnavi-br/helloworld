@@ -1,0 +1,26 @@
+name: javaja/javaja
+on:
+#   # The shortest interval you can run scheduled workflows is once every 5 minutes.
+#   period: '180'
+jobs:
+  Default-Stage-Default-Job:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4.1.0
+    - run: ls -la
+    - uses: actions/setup-java@v4.0.0
+      with:
+        distribution: zulu
+        java-version: '8'
+    - name: Run Maven
+      run: mvn clean package
+    - name: SonarScan
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: "${{ secrets.SONAR_TOKEN }}"
+        SONAR_HOST_URL: "${{ secrets.SONAR_HOST_URL }}"
+    - uses: actions/upload-artifact@v4.1.0
+      with:
+        name: JAVJA-JAV_JavaArtifact
+        path: "*"
+        if-no-files-found: error
