@@ -10,7 +10,7 @@ on:
       GITHUB_BASE_URL:
         type: string
         description: github url
-        default: https://github.com/
+        default: https://github.com/ 
         required: true
       audit:
         type: boolean
@@ -36,7 +36,6 @@ on:
         type: boolean
         description: deploy production run
         required: true    
-
 jobs:
   migration:
     runs-on: ubuntu-latest     
@@ -55,6 +54,7 @@ jobs:
           else
               echo "Docker is already installed. Skipping installation."
           fi
+
           docker --version
 
       - name: Install GitHub CLI
@@ -73,20 +73,23 @@ jobs:
       - name: GitHub Actions Importer Update
         run: gh actions-importer update
 
-      - name: Create gittoken.txt
+      - name: Create GH_PAT.txt
         run: |
-          echo ${{ secrets.GITTOKEN }} > gittoken.txt
-          cat gittoken.txt
+          echo ${{ secrets.GH_PAT }} > GH_PAT.txt
+          cat GH_PAT.txt
 
       - name: Authentication with GitHub CLI
         run: |
-          gh auth login --with-token < gittoken.txt
+          gh auth login --with-token < GH_PAT.txt
           gh auth status
+          #run: gh auth login --with-token ${{ secrets.GH_PAT }} -h github.com
+          #run: gh auth login --with-token ${{ secrets.GH_PAT }}
 
       - name: Audit Bamboo
         if: inputs.audit
         run: |
-          gh actions-importer audit bamboo --output-dir tmp/audit --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+          #gh auth login --with-token < GH_PAT.txt
+          gh actions-importer audit bamboo --output-dir tmp/audit --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GH_PAT }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
 
       - name: Display Audit Results
         if: inputs.audit
@@ -94,8 +97,7 @@ jobs:
 
       - name: Forecast GitHub Actions usage
         if: inputs.forecast
-        run: |
-          gh actions-importer forecast bamboo --start-date 2024-01-17 --output-dir tmp/forecast --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+        run: gh actions-importer forecast bamboo --start-date 2024-01-17 --output-dir tmp/forecast --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
 
       - name: Display Forecast Results
         if: inputs.forecast
@@ -118,21 +120,24 @@ jobs:
           while IFS=, read -r plan_slug target_url; do
             echo "Plan_slug: $plan_slug"
             echo "Target URL: $target_url"
-            gh actions-importer dry-run bamboo build --plan-slug $plan_slug --output-dir tmp/dry-run/$plan_slug --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+            gh actions-importer dry-run bamboo build --plan-slug $plan_slug --output-dir tmp/dry-run/$plan_slug --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GH_PAT }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
     
             # Display Dry-Run Results
             echo "Dry-Run Results for $plan_slug:"
             find tmp/dry-run/$plan_slug/ -name '*.yml' -print -exec cat {} \; 2>/dev/null || echo "No YAML files found for $plan_slug"                  
           done < "$PLAN_SLUGS_FILE"
 
+
       - name: Dry-Run Bamboo Deploy Plans
-        if: inputs.deploy-dry_run
+        if: inputs.build-production_run
         run: |
             while IFS=, read -r deployid target_url; do
                 echo "Deploy ID: $deployid"
                 echo "Target URL: $target_url"
-                gh actions-importer dry-run bamboo deployment --deployment-project-id $deployid  --output-dir tmp/dry-run/$deployid --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+                gh actions-importer dry-run bamboo deployment --deployment-project-id $deployid  --output-dir tmp/dry-run/$deployid --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GH_PAT }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+
                 #Display Dry-Run Results
+
                 echo "Dry-Run Results for deployment Id $deployid:"
                 find tmp/dry-run/$deployid/ -name '*.yml' -print -exec cat {} \; 2>/dev/null || echo "No YAML files found for $deployid"               
             done < "$DeployId"     
@@ -143,7 +148,7 @@ jobs:
           while IFS=, read -r plan_slug target_url; do
             echo "Plan_slug: $plan_slug"
             echo "Target URL: $target_url"
-            gh actions-importer migrate bamboo build --plan-slug $plan_slug --target-url $target_url --output-dir tmp/migrate/$plan_slug  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+            gh actions-importer migrate bamboo build --plan-slug $plan_slug --target-url $target_url --output-dir tmp/migrate/$plan_slug  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GH_PAT }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
           done < "$PLAN_SLUGS_FILE"
 
       - name: Migrate Bamboo Deploy Plans
@@ -152,7 +157,7 @@ jobs:
             while IFS=, read -r deployid target_url; do
                 echo "Deploy ID: $deployid"
                 echo "Target URL: $target_url"
-                gh actions-importer migrate bamboo deployment --deployment-project-id $deployid --target-url $target_url --output-dir tmp/migrate/$deployid  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GITTOKEN }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
+                gh actions-importer migrate bamboo deployment --deployment-project-id $deployid --target-url $target_url --output-dir tmp/migrate/$deployid  --custom-transformers transformer.rb --bamboo-access-token ${{ secrets.BAMBOO_TOKEN }} --github-access-token ${{ secrets.GH_PAT }} --github-instance-url ${{ inputs.GITHUB_BASE_URL }} --bamboo-instance-url ${{ inputs.BAMBOO_BASE_URL }}
             done < "$DeployId"
 
       - name: Save Results as Artifacts
@@ -165,3 +170,5 @@ jobs:
             tmp/forecast/forecast_report.md
             tmp/dry-run/
             tmp/migrate/
+
+     
