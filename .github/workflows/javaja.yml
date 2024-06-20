@@ -1,26 +1,42 @@
 name: javaja/javaja
 on:
-#   # The shortest interval you can run scheduled workflows is once every 5 minutes.
-#   period: '180'
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
 jobs:
-  Default-Stage-Default-Job:
+  build:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4.1.0
-    - run: ls -la
-    - uses: actions/setup-java@v4.0.0
-      with:
-        distribution: zulu
-        java-version: '8'
-    - name: Run Maven
-      run: mvn clean package
-    - name: SonarScan
-      uses: sonarsource/sonarqube-scan-action@master
-      env:
-        SONAR_TOKEN: "${{ secrets.SONAR_TOKEN }}"
-        SONAR_HOST_URL: "${{ secrets.SONAR_HOST_URL }}"
-    - uses: actions/upload-artifact@v4.1.0
-      with:
-        name: JAVJA-JAV_JavaArtifact
-        path: "*"
-        if-no-files-found: error
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.0
+
+      - name: List directory contents
+        run: ls -la
+
+      - name: Setup Java
+        uses: actions/setup-java@v4.0.0
+        with:
+          distribution: zulu
+          java-version: '8'
+          
+      - name: Run Maven
+        run: mvn clean package
+        
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          
+      - name: Upload Java artifact
+        uses: actions/upload-artifact@v4.1.0
+        with:
+          name: JAVJA-JAV_JavaArtifact
+          path: target/* 
+          if-no-files-found: error
