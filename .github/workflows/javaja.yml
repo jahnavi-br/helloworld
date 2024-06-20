@@ -24,19 +24,19 @@ jobs:
         with:
           distribution: zulu
           java-version: '11'
-          
+
       - name: Run Maven
         run: mvn clean package
-        
+
       - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
+        run: mvn sonar:sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          
+
       - name: Upload Java artifact
         uses: actions/upload-artifact@v4.1.0
         with:
           name: JAVJA-JAV_JavaArtifact
-          path: target/* 
+          path: target/*
           if-no-files-found: error
