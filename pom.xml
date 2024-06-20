@@ -18,8 +18,10 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <jdk.version>1.8</jdk.version>
-<sonar.projectKey>bamghajav</sonar.projectKey>
     <maven.compiler.plugin.version>3.8.1</maven.compiler.plugin.version>
+    <sonar.projectKey>bamghajav</sonar.projectKey>
+    <sonar.projectName>bamghajav</sonar.projectName>
+    <sonar.host.url>http://4.240.83.214:9000</sonar.host.url>
   </properties>
 
   <build>
